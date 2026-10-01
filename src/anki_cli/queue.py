@@ -4,12 +4,10 @@ import hashlib
 import json
 import os
 import shutil
-import subprocess
 from pathlib import Path
 from typing import Any
 
 from .schema import now_iso
-
 
 STATE_DIR = Path("state")
 PENDING_DIR = STATE_DIR / "queue" / "pending"
@@ -20,6 +18,7 @@ LEDGER_PATH = LEDGER_DIR / "notes.jsonl"
 
 
 def ensure_state_dirs(root: Path) -> None:
+    root.mkdir(mode=0o700, parents=True, exist_ok=True)
     for rel in (PENDING_DIR, DONE_DIR, FAILED_DIR, LEDGER_DIR):
         (root / rel).mkdir(parents=True, exist_ok=True)
 
@@ -135,39 +134,6 @@ def read_ledger(root: Path) -> list[dict[str, Any]]:
             if isinstance(value, dict):
                 entries.append(value)
     return entries
-
-
-def git_available(root: Path) -> bool:
-    return (root / ".git").exists()
-
-
-def git_status_short(root: Path) -> str:
-    if not git_available(root):
-        return "not a git repository"
-    proc = subprocess.run(
-        ["git", "status", "--short"],
-        cwd=root,
-        check=False,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-    )
-    return proc.stdout.strip()
-
-
-def maybe_git_commit(root: Path, message: str, push: bool = False) -> None:
-    if not git_available(root):
-        return
-    subprocess.run(["git", "add", "state"], cwd=root, check=True)
-    status = git_status_short(root)
-    if status:
-        subprocess.run(["git", "commit", "-m", message], cwd=root, check=True)
-    if push:
-        subprocess.run(["git", "push"], cwd=root, check=True)
-
-
-def repo_root_from_cwd() -> Path:
-    return Path.cwd()
 
 
 def clear_state(root: Path) -> None:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -17,10 +18,8 @@ from .queue import (
     append_ledger,
     enqueue_job,
     ensure_state_dirs,
-    git_status_short,
     mark_done,
     mark_failed,
-    maybe_git_commit,
     pending_jobs,
     read_json,
     read_ledger,
@@ -85,6 +84,12 @@ img {
 
 def print_json(data: Any) -> None:
     print(json.dumps(data, indent=2, ensure_ascii=False, sort_keys=True))
+
+
+def default_state_root() -> Path:
+    configured = Path(os.environ.get("XDG_STATE_HOME") or "").expanduser()
+    base = configured if configured.is_absolute() else Path.home() / ".local" / "state"
+    return base / "anki-cli"
 
 
 def read_text_arg(value: str | None, file_value: str | None, *, name: str, required: bool = False) -> str:
@@ -440,7 +445,6 @@ def cmd_doctor(args: argparse.Namespace) -> int:
                 "failed": str(root / FAILED_DIR),
                 "ledger": str(root / LEDGER_PATH),
             },
-            "git_status": git_status_short(root),
         }
     )
     print_json(report)
@@ -483,8 +487,6 @@ def cmd_enqueue_upsert(args: argparse.Namespace) -> int:
     if args.preview_html:
         Path(args.preview_html).write_text(render_preview_html(job), encoding="utf-8")
     if args.no_enqueue:
-        if args.commit or args.push:
-            raise SystemExit("--no-enqueue cannot be combined with --commit or --push")
         print_json(
             {
                 "ok": True,
@@ -496,8 +498,6 @@ def cmd_enqueue_upsert(args: argparse.Namespace) -> int:
         )
         return 0
     path = enqueue_job(root, job)
-    if args.commit or args.push:
-        maybe_git_commit(root, f"enqueue anki job {job['job_id']}", push=args.push)
     print_json({"ok": True, "path": str(path), "job_id": job["job_id"], "external_id": job["note"]["external_id"]})
     return 0
 
@@ -515,7 +515,6 @@ def cmd_status(args: argparse.Namespace) -> int:
         "failed_count": len(failed),
         "recent_done": [p.name for p in done[: args.limit]],
         "recent_failed": [p.name for p in failed[: args.limit]],
-        "git_status": git_status_short(root),
     }
     print_json(report)
     return 0
@@ -638,8 +637,6 @@ def cmd_drain(args: argparse.Namespace) -> int:
         except Exception as exc:
             sync_result = {"ok": False, "error": str(exc)}
 
-    if not args.dry_run and (args.commit or args.push):
-        maybe_git_commit(root, "drain anki queue", push=args.push)
     print_json({"ok": failures == 0, "backend": client.backend if client else None, "dry_run": args.dry_run, "processed": processed, "sync": sync_result})
     return 0 if failures == 0 else 1
 
@@ -766,7 +763,14 @@ def cmd_sync(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="anki-cli")
-    parser.add_argument("--root", default=".", help="Repository root containing state/")
+    parser.add_argument(
+        "--root",
+        default=default_state_root(),
+        help=(
+            "Directory containing state/ (default: "
+            "$XDG_STATE_HOME/anki-cli or ~/.local/state/anki-cli)."
+        ),
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     doctor = sub.add_parser("doctor")
@@ -814,8 +818,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     upsert.add_argument("--notetype", default=DEFAULT_NOTETYPE)
     upsert.add_argument("--agent", default="codex")
-    upsert.add_argument("--commit", action="store_true")
-    upsert.add_argument("--push", action="store_true")
     upsert.set_defaults(func=cmd_enqueue_upsert)
 
     drain = sub.add_parser("drain")
@@ -823,8 +825,6 @@ def build_parser() -> argparse.ArgumentParser:
     drain.add_argument("--timeout", type=float, default=60.0, help="Headless sync network I/O timeout in seconds.")
     drain.add_argument("--limit", type=int)
     drain.add_argument("--sync", action="store_true")
-    drain.add_argument("--commit", action="store_true")
-    drain.add_argument("--push", action="store_true")
     drain.set_defaults(func=cmd_drain)
 
     status = sub.add_parser("status")
