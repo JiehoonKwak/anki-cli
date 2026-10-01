@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import cast
 
-from anki_cli.ankiconnect import AnkiConnectClient
+from anki_cli.headless import HeadlessClient
 from anki_cli.cli import move_cards_to_deck
 
 
@@ -45,7 +45,7 @@ class FakeDeckClient:
 def test_move_cards_to_deck_preserves_scheduling_fields() -> None:
     client = FakeDeckClient()
 
-    result = move_cards_to_deck(cast(AnkiConnectClient, client), [101], "flashcard::statistics")
+    result = move_cards_to_deck(cast(HeadlessClient, client), [101], "flashcard::statistics")
 
     assert result["ok"] is True
     assert result["preserved_scheduling"] is True
@@ -56,7 +56,7 @@ def test_move_cards_to_deck_preserves_scheduling_fields() -> None:
 def test_move_cards_to_deck_detects_scheduling_mutation() -> None:
     client = FakeDeckClient(mutate_schedule=True)
 
-    result = move_cards_to_deck(cast(AnkiConnectClient, client), [101], "flashcard::statistics")
+    result = move_cards_to_deck(cast(HeadlessClient, client), [101], "flashcard::statistics")
 
     assert result["ok"] is False
     assert result["preserved_scheduling"] is False
@@ -66,7 +66,7 @@ def test_move_cards_to_deck_detects_scheduling_mutation() -> None:
 def test_move_cards_to_deck_dry_run_does_not_create_or_move() -> None:
     client = FakeDeckClient()
 
-    result = move_cards_to_deck(cast(AnkiConnectClient, client), [101], "flashcard::statistics", dry_run=True)
+    result = move_cards_to_deck(cast(HeadlessClient, client), [101], "flashcard::statistics", dry_run=True)
 
     assert result["ok"] is True
     assert result["dry_run"] is True

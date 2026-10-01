@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .ankiconnect import AnkiConnectError
 from .backend import AnkiClient, client_scope, get_client
 from .gap import build_gap_export
 from .host import hostname, inspect_host
@@ -445,12 +444,10 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         }
     )
     print_json(report)
-    if report["backend"] == "ankiconnect" and report["looks_like_anki_host"] and report["ankiconnect_bind_local"] is False:
-        return 2
     return 0
 
 
-def cmd_ensure_anki(args: argparse.Namespace) -> int:
+def cmd_ready(args: argparse.Namespace) -> int:
     client = get_client(timeout=args.timeout)
     status = anki_status(client)
     print_json({"ok": status["reachable"], "message": "collection ready; no desktop launch", "status": status})
@@ -618,36 +615,21 @@ def cmd_drain(args: argparse.Namespace) -> int:
                     anki_status=anki_status(client),
                 )
                 processed.append({"path": str(path), "failed": str(dest), "error": str(exc), "error_kind": "schema_error"})
-        except AnkiConnectError as exc:
-            failures += 1
-            if args.dry_run:
-                processed.append({"path": str(path), "dry_run": True, "error": str(exc), "error_kind": "ankiconnect_error"})
-            else:
-                dest = mark_failed(
-                    root,
-                    path,
-                    job,
-                    error=str(exc),
-                    error_kind="ankiconnect_error",
-                    host=hostname(),
-                    anki_status=anki_status(client),
-                )
-                processed.append({"path": str(path), "failed": str(dest), "error": str(exc), "error_kind": "ankiconnect_error"})
         except Exception as exc:
             failures += 1
             if args.dry_run:
-                processed.append({"path": str(path), "dry_run": True, "error": str(exc), "error_kind": "unknown_error"})
+                processed.append({"path": str(path), "dry_run": True, "error": str(exc), "error_kind": "backend_error"})
             else:
                 dest = mark_failed(
                     root,
                     path,
                     job,
                     error=str(exc),
-                    error_kind="unknown_error",
+                    error_kind="backend_error",
                     host=hostname(),
                     anki_status=anki_status(client),
                 )
-                processed.append({"path": str(path), "failed": str(dest), "error": str(exc), "error_kind": "unknown_error"})
+                processed.append({"path": str(path), "failed": str(dest), "error": str(exc), "error_kind": "backend_error"})
 
     sync_result: dict[str, Any] | None = None
     if args.sync and not args.dry_run and processed and failures == 0:
@@ -790,9 +772,9 @@ def build_parser() -> argparse.ArgumentParser:
     doctor = sub.add_parser("doctor")
     doctor.set_defaults(func=cmd_doctor)
 
-    ensure = sub.add_parser("ensure-anki")
-    ensure.add_argument("--timeout", type=float, default=30.0, help="Legacy option; no desktop launch occurs.")
-    ensure.set_defaults(func=cmd_ensure_anki)
+    ensure = sub.add_parser("ready", help="Check headless collection readiness.")
+    ensure.add_argument("--timeout", type=float, default=30.0, help="Headless network I/O timeout in seconds.")
+    ensure.set_defaults(func=cmd_ready)
 
     enqueue = sub.add_parser("enqueue")
     enqueue_sub = enqueue.add_subparsers(dest="enqueue_command", required=True)
@@ -838,7 +820,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     drain = sub.add_parser("drain")
     drain.add_argument("--dry-run", action="store_true")
-    drain.add_argument("--ensure-anki", action="store_true", help="Legacy compatibility flag; never launches Anki.")
     drain.add_argument("--timeout", type=float, default=60.0, help="Headless sync network I/O timeout in seconds.")
     drain.add_argument("--limit", type=int)
     drain.add_argument("--sync", action="store_true")

@@ -1,6 +1,6 @@
 [project]
 name = "anki-cli"
-version = "0.2.0"
+version = "0.3.0"
 description = "CLI for Anki note upserts"
 readme = "README.md"
 requires-python = ">=3.11"

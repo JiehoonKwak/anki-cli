@@ -113,7 +113,7 @@ class HeadlessClient:
             fcntl.flock(self._lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             if collection_in_use(self.path):
                 raise RuntimeError(
-                    "collection is open in another process; use its existing AnkiConnect connection or retry after closing Anki"
+                    "collection is open in another process; headless-only access requires it to be closed"
                 )
             self.col = Collection(str(self.path))
         except BaseException:
@@ -296,7 +296,7 @@ class HeadlessClient:
         self.col.set_user_flag_for_cards(flag, card_ids)
 
     def get_reviews_of_cards(self, cards: list[int]) -> dict[str, list[dict[str, int]]]:
-        # Read-only SQL preserves AnkiConnect's millisecond IDs and raw revlog shape.
+        # Read-only SQL preserves millisecond IDs and the existing revlog output shape.
         keys = ["id", "cid", "usn", "ease", "ivl", "lastIvl", "factor", "time", "type"]
         return {
             str(cid): [
@@ -326,7 +326,7 @@ class HeadlessClient:
         out = self.col.sync_collection(auth, False)
         if out.required not in (out.NO_CHANGES, out.NORMAL_SYNC):
             raise RuntimeError(
-                "full sync required; resolve upload/download direction in Anki Desktop"
+                "full sync required; an explicit upload/download decision is required"
             )
         # Use the redirect returned by collection sync for media, too.
         if out.new_endpoint:

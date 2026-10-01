@@ -7,7 +7,7 @@ from typing import cast
 
 import pytest
 
-from anki_cli.ankiconnect import AnkiConnectClient
+from anki_cli.headless import HeadlessClient
 from anki_cli.cli import main, rendered_fields, upsert_job
 from anki_cli.schema import SchemaError, build_upsert_job, validate_job
 
@@ -91,7 +91,7 @@ def test_upsert_job_stores_front_media_and_renders_img_tag(tmp_path: Path) -> No
         front_media_files=[str(image)],
     )
 
-    result = upsert_job(cast(AnkiConnectClient, FakeClient()), job)
+    result = upsert_job(cast(HeadlessClient, FakeClient()), job)
 
     assert result["action"] == "added"
     fields = rendered_fields(job)
@@ -101,7 +101,7 @@ def test_upsert_job_stores_front_media_and_renders_img_tag(tmp_path: Path) -> No
     assert job["note"]["media"][0]["kind"] == "other"
 
 
-def test_upsert_job_calls_ankiconnect_store_media_file_before_add_note(tmp_path: Path) -> None:
+def test_upsert_job_calls_backend_store_media_file_before_add_note(tmp_path: Path) -> None:
     image = tmp_path / "figure.png"
     image.write_bytes(b"fake-png")
     client = FakeClient()
@@ -113,7 +113,7 @@ def test_upsert_job_calls_ankiconnect_store_media_file_before_add_note(tmp_path:
         front_media_files=[str(image)],
     )
 
-    upsert_job(cast(AnkiConnectClient, client), job)
+    upsert_job(cast(HeadlessClient, client), job)
 
     assert client.stored_media == [
         {"filename": job["note"]["media"][0]["filename"], "path": str(image.resolve())}
@@ -131,7 +131,7 @@ def test_upsert_job_moves_generated_cards_to_target_deck_when_anki_uses_default(
         external_id="concept:test-deck-move",
     )
 
-    result = upsert_job(cast(AnkiConnectClient, client), job)
+    result = upsert_job(cast(HeadlessClient, client), job)
 
     assert result["deck_move"]["status"] == "moved"
     assert result["deck_move"]["current_decks_before_move"] == ["Default"]

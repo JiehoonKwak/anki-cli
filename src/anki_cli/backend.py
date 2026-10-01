@@ -1,4 +1,4 @@
-"""Select local headless access or reuse an already-open desktop connection."""
+"""Own a headless collection session without any GUI or HTTP backend."""
 
 from __future__ import annotations
 
@@ -7,10 +7,9 @@ from contextlib import ExitStack, contextmanager
 from contextvars import ContextVar
 from typing import Iterator
 
-from .ankiconnect import AnkiConnectClient
 from .headless import HeadlessClient, collection_target
 
-AnkiClient = AnkiConnectClient | HeadlessClient
+AnkiClient = HeadlessClient
 
 _scope: ContextVar[ExitStack | None] = ContextVar("anki_cli_scope", default=None)
 
@@ -26,18 +25,10 @@ def client_scope() -> Iterator[None]:
 
 
 def get_client(*, timeout: float | None = None) -> AnkiClient:
-    mode = os.environ.get("ANKI_CLI_BACKEND", "auto")
-    if mode not in ("auto", "headless", "ankiconnect"):
-        raise ValueError("ANKI_CLI_BACKEND must be auto, headless, or ankiconnect")
-    desktop = AnkiConnectClient.from_env()
-    explicit_target = any(
-        os.environ.get(key)
-        for key in ("ANKI_CLI_COLLECTION", "ANKI_CLI_PROFILE", "ANKI_CLI_BASE")
-    )
-    if mode == "ankiconnect" or (
-        mode == "auto" and not explicit_target and desktop.reachable()
-    ):
-        return desktop
+    if os.environ.get("ANKI_CLI_BACKEND", "headless") != "headless":
+        raise ValueError(
+            "only headless is supported; remove the legacy ANKI_CLI_BACKEND setting"
+        )
     path, profile = collection_target()
     if timeout is not None:
         if timeout <= 0:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any, cast
 
-from anki_cli.ankiconnect import AnkiConnectClient
+from anki_cli.headless import HeadlessClient
 from anki_cli.gap import build_gap_export, review_stats, strip_html, tokenize
 
 
@@ -138,7 +138,7 @@ def test_learning_button_two_is_not_counted_as_hard() -> None:
 
 
 def test_gap_export_excludes_single_new_again_and_clusters_mature_friction() -> None:
-    export = build_gap_export(cast(AnkiConnectClient, FakeGapClient()), now=NOW, days=30, recent_days=7, include_text="preview")
+    export = build_gap_export(cast(HeadlessClient, FakeGapClient()), now=NOW, days=30, recent_days=7, include_text="preview")
 
     candidate_ids = {item["card_id"] for item in export["candidates"]}
     assert 101 not in candidate_ids  # single new-card Again is normal learning noise

@@ -272,19 +272,6 @@ def test_profile_pickle_cannot_execute_code(tmp_path):
         read_profiles(tmp_path)
 
 
-def test_auto_reuses_open_desktop_without_opening_collection(monkeypatch):
-    monkeypatch.delenv("ANKI_CLI_COLLECTION", raising=False)
-    monkeypatch.setenv("ANKI_CLI_BACKEND", "auto")
-    monkeypatch.setattr(
-        "anki_cli.backend.AnkiConnectClient.reachable", lambda self: True
-    )
-    monkeypatch.setattr(
-        "anki_cli.backend.collection_target", lambda: pytest.fail("must reuse desktop")
-    )
-    with client_scope():
-        assert get_client().backend == "ankiconnect"
-
-
 def test_headless_cli_queue_drain_and_reopen(
     collection_path, tmp_path, monkeypatch, capsys
 ):
@@ -456,21 +443,6 @@ def test_native_backend_errors_are_json(collection_path, tmp_path, monkeypatch, 
     assert output["error_type"] == "SearchError"
 
 
-def test_auto_explicit_profile_cannot_write_to_other_open_profile(
-    collection_path, monkeypatch
-):
-    monkeypatch.setenv("ANKI_CLI_BACKEND", "auto")
-    monkeypatch.setenv("ANKI_CLI_PROFILE", "requested")
-    monkeypatch.setattr(
-        "anki_cli.backend.AnkiConnectClient.reachable", lambda self: True
-    )
-    monkeypatch.setattr(
-        "anki_cli.backend.collection_target", lambda: (collection_path, {})
-    )
-    with client_scope():
-        assert get_client().backend == "headless"
-
-
 def test_queue_media_reaches_rendered_answer_and_media_store(
     collection_path, tmp_path, monkeypatch, capsys
 ):
@@ -513,3 +485,28 @@ def test_queue_media_reaches_rendered_answer_and_media_store(
         assert filename in c.cards_info([cid])[0]["answer"]
         assert r"\(H_3\)" in c.cards_info([cid])[0]["answer"]
         assert (Path(c.col.media.dir()) / filename).read_bytes() == media.read_bytes()
+
+
+@pytest.mark.parametrize("mode", ["auto", "ankiconnect", "gui"])
+def test_legacy_gui_backend_is_rejected_before_collection_access(monkeypatch, mode):
+    monkeypatch.setenv("ANKI_CLI_BACKEND", mode)
+    monkeypatch.setattr(
+        "anki_cli.backend.collection_target",
+        lambda: pytest.fail("must fail before access"),
+    )
+    with client_scope(), pytest.raises(ValueError, match="only headless"):
+        get_client()
+
+
+def test_default_is_headless_without_backend_setting(collection_path, monkeypatch):
+    monkeypatch.delenv("ANKI_CLI_BACKEND", raising=False)
+    monkeypatch.setenv("ANKI_CLI_COLLECTION", str(collection_path))
+    with client_scope():
+        assert get_client().backend == "headless"
+
+
+def test_app_launch_options_are_not_in_cli(tmp_path):
+    with pytest.raises(SystemExit):
+        main(["--root", str(tmp_path), "drain", "--ensure-anki"])
+    with pytest.raises(SystemExit):
+        main(["ensure-anki"])
