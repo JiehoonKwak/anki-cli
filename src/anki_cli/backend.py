@@ -1,0 +1,52 @@
+"""Select local headless access or reuse an already-open desktop connection."""
+
+from __future__ import annotations
+
+import os
+from contextlib import ExitStack, contextmanager
+from contextvars import ContextVar
+from typing import Iterator
+
+from .ankiconnect import AnkiConnectClient
+from .headless import HeadlessClient, collection_target
+
+AnkiClient = AnkiConnectClient | HeadlessClient
+
+_scope: ContextVar[ExitStack | None] = ContextVar("anki_cli_scope", default=None)
+
+
+@contextmanager
+def client_scope() -> Iterator[None]:
+    with ExitStack() as stack:
+        token = _scope.set(stack)
+        try:
+            yield
+        finally:
+            _scope.reset(token)
+
+
+def get_client(*, timeout: float | None = None) -> AnkiClient:
+    mode = os.environ.get("ANKI_CLI_BACKEND", "auto")
+    if mode not in ("auto", "headless", "ankiconnect"):
+        raise ValueError("ANKI_CLI_BACKEND must be auto, headless, or ankiconnect")
+    desktop = AnkiConnectClient.from_env()
+    explicit_target = any(
+        os.environ.get(key)
+        for key in ("ANKI_CLI_COLLECTION", "ANKI_CLI_PROFILE", "ANKI_CLI_BASE")
+    )
+    if mode == "ankiconnect" or (
+        mode == "auto" and not explicit_target and desktop.reachable()
+    ):
+        return desktop
+    path, profile = collection_target()
+    if timeout is not None:
+        if timeout <= 0:
+            raise ValueError("timeout must be positive")
+        profile = {**profile, "networkTimeout": max(1, int(timeout))}
+    client = HeadlessClient(path, profile)
+    stack = _scope.get()
+    if stack is None:
+        client.close()
+        raise RuntimeError("headless client requires a client_scope")
+    stack.callback(client.close)
+    return client

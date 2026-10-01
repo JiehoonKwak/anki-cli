@@ -3,13 +3,13 @@ from __future__ import annotations
 import argparse
 import html
 import json
-import sys
 from pathlib import Path
 from typing import Any
 
-from .ankiconnect import AnkiConnectClient, AnkiConnectError
+from .ankiconnect import AnkiConnectError
+from .backend import AnkiClient, client_scope, get_client
 from .gap import build_gap_export
-from .host import hostname, inspect_host, launch_anki, wait_for_ankiconnect
+from .host import hostname, inspect_host
 from .queue import (
     DONE_DIR,
     FAILED_DIR,
@@ -25,7 +25,6 @@ from .queue import (
     pending_jobs,
     read_json,
     read_ledger,
-    repo_root_from_cwd,
 )
 from .render import render_field
 from .schema import DEFAULT_NOTETYPE, SchemaError, build_upsert_job, now_iso, validate_job
@@ -133,19 +132,19 @@ def parse_media_manifests(file_values: list[str] | None) -> list[dict[str, Any]]
     return media
 
 
-def anki_status(client: AnkiConnectClient) -> dict[str, Any]:
+def anki_status(client: AnkiClient) -> dict[str, Any]:
     try:
-        return {"reachable": True, "version": client.version(), "url": client.url}
+        return {"reachable": True, "backend": client.backend, "version": client.version(), "url": client.url}
     except Exception as exc:
         return {"reachable": False, "error": str(exc), "url": client.url}
 
 
-def ensure_deck(client: AnkiConnectClient, deck: str) -> None:
+def ensure_deck(client: AnkiClient, deck: str) -> None:
     if deck not in client.deck_names():
         client.create_deck(deck)
 
 
-def ensure_notetype(client: AnkiConnectClient, notetype: str) -> None:
+def ensure_notetype(client: AnkiClient, notetype: str) -> None:
     model_names = client.model_names()
     if notetype not in model_names:
         client.create_model(notetype, NOTETYPE_FIELDS, FRONT_TEMPLATE, BACK_TEMPLATE, MODEL_CSS)
@@ -163,7 +162,7 @@ def core_card_state(info: dict[str, Any]) -> dict[str, Any]:
 
 
 def move_cards_to_deck(
-    client: AnkiConnectClient,
+    client: AnkiClient,
     cards: list[int],
     deck: str,
     *,
@@ -203,7 +202,7 @@ def move_cards_to_deck(
 
 
 def ensure_note_cards_in_deck(
-    client: AnkiConnectClient,
+    client: AnkiClient,
     note_id: int,
     deck: str,
 ) -> dict[str, Any]:
@@ -236,7 +235,7 @@ def note_field(info: dict[str, Any], field: str) -> str:
     return ""
 
 
-def find_note_by_external_id(client: AnkiConnectClient, notetype: str, external_id: str) -> dict[str, Any] | None:
+def find_note_by_external_id(client: AnkiClient, notetype: str, external_id: str) -> dict[str, Any] | None:
     infos = client.notes_info(query=f"note:{notetype}")
     matches = [info for info in infos if note_field(info, "ExternalID") == external_id]
     if len(matches) > 1:
@@ -397,7 +396,7 @@ def rendered_fields(job: dict[str, Any]) -> dict[str, str]:
     }
 
 
-def upsert_job(client: AnkiConnectClient, job: dict[str, Any]) -> dict[str, Any]:
+def upsert_job(client: AnkiClient, job: dict[str, Any]) -> dict[str, Any]:
     target = job["target"]
     note = job["note"]
     deck = target["deck"]
@@ -431,7 +430,7 @@ def upsert_job(client: AnkiConnectClient, job: dict[str, Any]) -> dict[str, Any]
 
 def cmd_doctor(args: argparse.Namespace) -> int:
     root = Path(args.root).resolve()
-    client = AnkiConnectClient.from_env()
+    client = get_client()
     report = inspect_host(client)
     report.update(
         {
@@ -446,22 +445,16 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         }
     )
     print_json(report)
-    if report["looks_like_anki_host"] and report["ankiconnect_bind_local"] is False:
+    if report["backend"] == "ankiconnect" and report["looks_like_anki_host"] and report["ankiconnect_bind_local"] is False:
         return 2
     return 0
 
 
 def cmd_ensure_anki(args: argparse.Namespace) -> int:
-    client = AnkiConnectClient.from_env()
-    if client.reachable():
-        print_json({"ok": True, "message": "AnkiConnect already reachable", "status": anki_status(client)})
-        return 0
-    launch_anki()
-    if wait_for_ankiconnect(client, args.timeout):
-        print_json({"ok": True, "message": "AnkiConnect reachable after launch", "status": anki_status(client)})
-        return 0
-    print_json({"ok": False, "message": "AnkiConnect did not become reachable", "status": anki_status(client)})
-    return 1
+    client = get_client(timeout=args.timeout)
+    status = anki_status(client)
+    print_json({"ok": status["reachable"], "message": "collection ready; no desktop launch", "status": status})
+    return 0 if status["reachable"] else 1
 
 
 def cmd_enqueue_upsert(args: argparse.Namespace) -> int:
@@ -532,7 +525,7 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 
 def cmd_decks(args: argparse.Namespace) -> int:
-    client = AnkiConnectClient.from_env()
+    client = get_client()
     decks = client.deck_names()
     items: list[dict[str, Any]] = []
     for deck in decks:
@@ -547,7 +540,7 @@ def cmd_decks(args: argparse.Namespace) -> int:
 
 
 def cmd_move_deck(args: argparse.Namespace) -> int:
-    client = AnkiConnectClient.from_env()
+    client = get_client()
     if args.sync_first:
         client.sync()
     query = f'deck:"{args.from_deck}"'
@@ -567,17 +560,10 @@ def cmd_move_deck(args: argparse.Namespace) -> int:
 def cmd_drain(args: argparse.Namespace) -> int:
     root = Path(args.root).resolve()
     ensure_state_dirs(root)
-    client = AnkiConnectClient.from_env()
-    if not args.dry_run:
-        if not client.reachable():
-            if args.ensure_anki:
-                launch_anki()
-                if not wait_for_ankiconnect(client, args.timeout):
-                    print_json({"ok": False, "error": "AnkiConnect unavailable after launch", "status": anki_status(client)})
-                    return 1
-            else:
-                print_json({"ok": False, "error": "AnkiConnect unavailable", "status": anki_status(client)})
-                return 1
+    client = None if args.dry_run else get_client(timeout=args.timeout)
+    if not args.dry_run and not client.reachable():
+        print_json({"ok": False, "error": "collection unavailable; desktop launch disabled", "status": anki_status(client)})
+        return 1
 
     processed: list[dict[str, Any]] = []
     failures = 0
@@ -672,7 +658,7 @@ def cmd_drain(args: argparse.Namespace) -> int:
 
     if not args.dry_run and (args.commit or args.push):
         maybe_git_commit(root, "drain anki queue", push=args.push)
-    print_json({"ok": failures == 0, "dry_run": args.dry_run, "processed": processed, "sync": sync_result})
+    print_json({"ok": failures == 0, "backend": client.backend if client else None, "dry_run": args.dry_run, "processed": processed, "sync": sync_result})
     return 0 if failures == 0 else 1
 
 
@@ -686,7 +672,7 @@ def cmd_find(args: argparse.Namespace) -> int:
             entries = [entry for entry in entries if entry.get("deck") == args.deck]
         print_json({"mode": "ledger", "count": len(entries), "items": entries})
         return 0
-    client = AnkiConnectClient.from_env()
+    client = get_client()
     if args.sync_first:
         client.sync()
     if args.external_id:
@@ -710,7 +696,7 @@ def cmd_find(args: argparse.Namespace) -> int:
 
 
 def cmd_clear(args: argparse.Namespace) -> int:
-    client = AnkiConnectClient.from_env()
+    client = get_client()
     if args.sync_first:
         client.sync()
     query_parts: list[str] = []
@@ -733,7 +719,11 @@ def cmd_clear(args: argparse.Namespace) -> int:
 
     card_ids: list[int] = []
     if args.flag is not None:
-        card_ids = client.find_cards(" ".join(query_parts))
+        if args.external_id:
+            candidate_ids = [int(cid) for info in infos for cid in info.get("cards", [])]
+            card_ids = [int(info["cardId"]) for info in client.cards_info(candidate_ids) if int(info.get("flags", 0)) & 7 == args.flag]
+        else:
+            card_ids = client.find_cards(" ".join(query_parts))
     note_ids = [int(info["noteId"]) for info in infos]
     removed_tags: list[str] = []
     if args.marked:
@@ -765,7 +755,7 @@ def cmd_clear(args: argparse.Namespace) -> int:
 
 
 def cmd_gap_export(args: argparse.Namespace) -> int:
-    client = AnkiConnectClient.from_env()
+    client = get_client()
     if args.sync_first:
         client.sync()
     export = build_gap_export(
@@ -786,7 +776,7 @@ def cmd_gap_export(args: argparse.Namespace) -> int:
 
 
 def cmd_sync(args: argparse.Namespace) -> int:
-    client = AnkiConnectClient.from_env()
+    client = get_client()
     result = client.sync()
     print_json({"ok": True, "result": result})
     return 0
@@ -801,7 +791,7 @@ def build_parser() -> argparse.ArgumentParser:
     doctor.set_defaults(func=cmd_doctor)
 
     ensure = sub.add_parser("ensure-anki")
-    ensure.add_argument("--timeout", type=float, default=30.0)
+    ensure.add_argument("--timeout", type=float, default=30.0, help="Legacy option; no desktop launch occurs.")
     ensure.set_defaults(func=cmd_ensure_anki)
 
     enqueue = sub.add_parser("enqueue")
@@ -848,8 +838,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     drain = sub.add_parser("drain")
     drain.add_argument("--dry-run", action="store_true")
-    drain.add_argument("--ensure-anki", action="store_true")
-    drain.add_argument("--timeout", type=float, default=30.0)
+    drain.add_argument("--ensure-anki", action="store_true", help="Legacy compatibility flag; never launches Anki.")
+    drain.add_argument("--timeout", type=float, default=60.0, help="Headless sync network I/O timeout in seconds.")
     drain.add_argument("--limit", type=int)
     drain.add_argument("--sync", action="store_true")
     drain.add_argument("--commit", action="store_true")
@@ -924,8 +914,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
-        return int(args.func(args))
-    except (SchemaError, AnkiConnectError, RuntimeError, OSError, json.JSONDecodeError, ValueError) as exc:
+        with client_scope():
+            return int(args.func(args))
+    except Exception as exc:
         print_json({"ok": False, "error": str(exc), "error_type": exc.__class__.__name__})
         return 1
 

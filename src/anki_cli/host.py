@@ -4,12 +4,10 @@ import json
 import os
 import platform
 import socket
-import subprocess
-import time
 from pathlib import Path
 from typing import Any
 
-from .ankiconnect import AnkiConnectClient
+from .backend import AnkiClient
 
 
 ADDON_ID = "2055492159"
@@ -66,24 +64,7 @@ def bind_is_local(config: dict[str, Any] | None) -> bool | None:
     return bind in {"127.0.0.1", "localhost", "::1"}
 
 
-def launch_anki() -> None:
-    if not is_macos():
-        raise RuntimeError("automatic Anki launch is only implemented for macOS")
-    if find_anki_app() is None:
-        raise RuntimeError("Anki.app was not found")
-    subprocess.run(["open", "-ga", "Anki"], check=True)
-
-
-def wait_for_ankiconnect(client: AnkiConnectClient, timeout_seconds: float) -> bool:
-    deadline = time.monotonic() + timeout_seconds
-    while time.monotonic() < deadline:
-        if client.reachable():
-            return True
-        time.sleep(1.0)
-    return client.reachable()
-
-
-def inspect_host(client: AnkiConnectClient) -> dict[str, Any]:
+def inspect_host(client: AnkiClient) -> dict[str, Any]:
     config = read_ankiconnect_config()
     reachable = client.reachable()
     return {
@@ -94,12 +75,15 @@ def inspect_host(client: AnkiConnectClient) -> dict[str, Any]:
         "anki_installed": find_anki_app() is not None,
         "ankiconnect_addon": str(ankiconnect_addon_dir()) if ankiconnect_addon_dir().exists() else None,
         "ankiconnect_addon_installed": ankiconnect_addon_dir().exists(),
-        "ankiconnect_url": client.url,
-        "ankiconnect_reachable": reachable,
+        "ankiconnect_url": client.url if client.backend == "ankiconnect" else None,
+        "collection_path": str(client.path) if client.backend == "headless" else None,
+        "ankiconnect_reachable": reachable if client.backend == "ankiconnect" else False,
+        "backend": client.backend,
+        "collection_reachable": reachable,
         "ankiconnect_bind_local": bind_is_local(config),
         "configured_anki_host": os.environ.get("ANKI_CLI_ANKI_HOST"),
         "looks_like_anki_host": (
             os.environ.get("ANKI_CLI_ANKI_HOST") in {None, "", hostname()}
-            and find_anki_app() is not None
+            and (client.backend == "headless" or find_anki_app() is not None)
         ),
     }

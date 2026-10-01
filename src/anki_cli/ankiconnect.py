@@ -16,6 +16,8 @@ class AnkiConnectError(RuntimeError):
 
 @dataclass(frozen=True)
 class AnkiConnectClient:
+    backend = "ankiconnect"
+
     url: str = "http://127.0.0.1:8765"
     api_key: str | None = None
     timeout: float = 10.0

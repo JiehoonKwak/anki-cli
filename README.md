@@ -1,3 +1,3 @@
 # anki-cli
 
-A command-line tool for creating and updating Anki notes. Run `uv sync` and `uv run anki-cli --help`.
+Create and update Anki notes with a local queue. Uses Anki's headless library when Desktop is closed. Run `uv sync` and `uv run anki-cli --help`.

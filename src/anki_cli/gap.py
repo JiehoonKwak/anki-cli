@@ -6,7 +6,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from typing import Any
 
-from .ankiconnect import AnkiConnectClient
+from .backend import AnkiClient
 
 GENERIC_TAGS = {
     "llm_generated",
@@ -399,14 +399,14 @@ def scoped_query(base: str, *, decks: list[str] | None = None, extra_query: str 
     return queries
 
 
-def find_cards_for(client: AnkiConnectClient, base: str, *, decks: list[str] | None, extra_query: str | None) -> list[int]:
+def find_cards_for(client: AnkiClient, base: str, *, decks: list[str] | None, extra_query: str | None) -> list[int]:
     found: list[int] = []
     for query in scoped_query(base, decks=decks, extra_query=extra_query):
         found.extend(client.find_cards(query))
     return sorted(set(found))
 
 
-def note_by_id(client: AnkiConnectClient, note_ids: list[int]) -> dict[int, dict[str, Any]]:
+def note_by_id(client: AnkiClient, note_ids: list[int]) -> dict[int, dict[str, Any]]:
     if not note_ids:
         return {}
     infos = client.notes_info(notes=sorted(set(note_ids)))
@@ -439,7 +439,7 @@ def source_payload(card_info: dict[str, Any], note_info: dict[str, Any] | None) 
 
 
 def build_gap_export(
-    client: AnkiConnectClient,
+    client: AnkiClient,
     *,
     days: int = 30,
     recent_days: int = 7,
