@@ -21,12 +21,19 @@ close another process. `ready` checks headless readiness; `ensure-anki` and the
 AnkiConnect backend are retired. A network I/O timeout does not bound an entire
 large media synchronization.
 
+Obsolete `ANKI_CLI_BACKEND` values fail rather than silently falling back.
+
 ## Queue states and retries
 
 The global `--root` option precedes the subcommand and selects the private
 runtime directory containing `state/`. Enqueue and drain must use the same
 root. Git updates move code, not queue jobs or attached media. A remote queue
 requires separately authorized private delivery to the intended owner.
+
+Queue, done/failed records and ledger default to `$XDG_STATE_HOME/anki-cli` when
+that variable is absolute, otherwise `~/.local/state/anki-cli`. Keep private
+history and personal operating data out of every new public commit, not just
+the current tree.
 
 - `pending`: validated intent awaits application. Drain obtains collection
   access before iterating jobs, so a busy collection leaves jobs pending.
@@ -41,6 +48,8 @@ Reuse a stable `ExternalID` for the same logical note. For interrupted work,
 compare queue state, ledger and `find --live --external-id` against the actual
 collection. A ledger entry alone does not prove that a note still exists or
 that its content/deck is correct. Avoid generating a new ID merely to retry.
+Live `ExternalID` matches in the selected notetype identify the upsert; duplicate
+matches fail instead of choosing one arbitrarily.
 
 `drain --dry-run` validates queued work without opening the collection. Other
 commands' dry runs can still open/read the collection; check the particular
@@ -50,6 +59,8 @@ command before using it as a no-access check.
 
 Read the resulting note fields, card IDs and actual `deckName`; for a deck move,
 retain note/card identity and scheduling rather than recreating the note.
+Upsert reads generated cards and attempts a move when their deck differs from
+the requested deck; inspect `deck_move.ok` and the actual cards afterward.
 `move_cards_to_deck` compares type, queue, due, interval, reps and lapses as well
 as card/note identity. Check its reported errors.
 

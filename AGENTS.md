@@ -1,6 +1,6 @@
 # Anki CLI agent guide
 
-Read [STATE.md](STATE.md) for the adopted architecture and its reasons, then
+Read [STATE.md](STATE.md) for current work and the decision index, then
 [operations](docs/operations.md) for queue recovery, collection ownership and
 verification. [README.md](README.md) owns installation and the concise public
 introduction; keep its English body under 300 characters.
