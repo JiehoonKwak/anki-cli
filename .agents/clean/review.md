@@ -33,3 +33,46 @@ requirements without opening a collection. Keep personal study policy and raw
 card data outside this public repository. Runtime readiness, actual card state,
 account sync, external schedules and remote delivery need independent evidence
 for the particular authorized operational task.
+
+
+## D-20261010 memory index
+
+Approval: the user approved the memory-index plan on 2026-10-10 (pilot on
+`~/.agents`, then one Codex agent per project). Applied: commit `94579c6`. Recovery:
+`git revert 94579c6`.
+
+Changed files:
+
+```text
+AGENTS.md          |  2 +-
+ STATE.md           | 80 ++++++++++++++++++------------------------------------
+ docs/operations.md | 11 ++++++++
+ 3 files changed, 39 insertions(+), 54 deletions(-)
+```
+
+Agent receipt:
+
+1. **Line counts:** `STATE.md` **60 → 34**; `AGENTS.md` **23 → 23**. STATE now contains the goal, recorded work status, blockers/questions, six linked decisions and next step.
+
+2. **Moved items:**
+
+| Fact | Destination |
+|---|---|
+| Runtime-root defaults and public-history privacy | `docs/operations.md` — Queue states and retries |
+| Duplicate live `ExternalID` rejection | `docs/operations.md` — Queue states and retries |
+| Obsolete backend settings fail | `docs/operations.md` — Select the local owner |
+| Upsert checks actual decks and attempts movement | `docs/operations.md` — Verify application and sync separately |
+
+3. **Removed repetition and narration:**
+
+| Removed from STATE | Substance preserved in |
+|---|---|
+| Headless rationale and retained queue/drain reasons | `docs/decisions/2026-10-01-headless-local-queue.md` |
+| Sync, cleanup, deck-verification and gap-analysis explanations | `docs/operations.md` |
+| Review date/hash/version and historical correction/event narration | Git history; operative rules remain in topic owners |
+
+4. **New files:** None.
+
+5. **Limits and verification:** No clearly human-authored passage was identified; all substantive rules were retained. `.agents/clean/` audit records could not be updated because that directory is read-only. The excluded `inventory.json` remained untouched.
+
+All **20 relative links and anchors resolve**, and `git diff --check` passes. Only the three documentation files changed; no builds, tests, collection operations or Git mutations were performed.
