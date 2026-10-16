@@ -1,0 +1,15 @@
+{
+  "declaration_version": 1,
+  "project": "anki-cli-be20193b",
+  "no_data": true,
+  "reason": "This public code repository has no retained project-data payload. Private cards, collections, queue jobs, ledger, media and credentials remain in their existing runtime owners; Git distributes package source and synthetic fixtures.",
+  "retained": [],
+  "exclude": [],
+  "recipients": {},
+  "archive": {
+    "mode": "none",
+    "paths": [],
+    "reason": "This public code repository has no retained project-data payload. Private cards, collections, queue jobs, ledger, media and credentials remain in their existing runtime owners; Git distributes package source and synthetic fixtures."
+  },
+  "snapshots": []
+}

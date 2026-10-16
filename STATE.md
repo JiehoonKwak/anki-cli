@@ -1,6 +1,6 @@
 # Anki CLI state
 
-Updated: 2026-10-10 11:24:48 (Asia/Seoul)
+Updated: 2026-10-16 (Asia/Seoul)
 
 ## Current goal
 
@@ -13,6 +13,8 @@ No active implementation task is recorded. Operational workflows and recovery
 are owned by [operations](docs/operations.md).
 
 ## Decisions in force
+
+- [.ctxdata.json](.ctxdata.json) declares no retained project-data payload; private collections, queue, ledger and media stay with their existing runtime owners.
 
 - Use headless-only access without a Desktop fallback — [architecture decision](docs/decisions/2026-10-01-headless-local-queue.md).
 - Retain local enqueue/drain so pending intent survives a busy collection — [queue rationale](docs/decisions/2026-10-01-headless-local-queue.md).
