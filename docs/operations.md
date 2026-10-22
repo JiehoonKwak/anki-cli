@@ -4,6 +4,9 @@ Living reference for the headless-only CLI. Collection commands below describe
 an authorized operational workflow; they are not necessary for documentation
 checks.
 
+The CLI applies local queued note upserts through the official Anki library
+pinned in [pyproject.toml](../pyproject.toml), without opening Anki Desktop.
+
 ## Select the local owner
 
 `ANKI_CLI_COLLECTION` selects an exact existing collection. Otherwise
@@ -24,6 +27,10 @@ large media synchronization.
 Obsolete `ANKI_CLI_BACKEND` values fail rather than silently falling back.
 
 ## Queue states and retries
+
+[.ctxdata.json](../.ctxdata.json) declares no retained project-data payload.
+Private cards, collections, queue jobs, ledger, media and credentials remain
+with their runtime owners; Git distributes package source and synthetic fixtures.
 
 The global `--root` option precedes the subcommand and selects the private
 runtime directory containing `state/`. Enqueue and drain must use the same
