@@ -1,0 +1,93 @@
+/* AnkiCLI-Basic-v1 styling. Upserts re-apply it to the notetype, so cards carry
+   semantic classes (gist, flow, vs, viz, ctx) instead of inline colors. Colors are
+   variables switched by the night-mode classes of desktop, AnkiMobile and AnkiDroid. */
+.card {
+  --fg: #1c1c1e;
+  --muted: #6b6b72;
+  --line: #d6d6dc;
+  --soft: #f2f2f5;
+  --a: #2160c4;
+  --a-soft: #e6eefb;
+  --b: #b9501a;
+  --b-soft: #fbece3;
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Helvetica Neue", Arial, sans-serif;
+  font-size: 18px;
+  line-height: 1.55;
+  text-align: left;
+  color: var(--fg);
+  overflow-wrap: break-word;
+}
+.card.nightMode, .nightMode .card, .card.night_mode, .night_mode .card {
+  --fg: #e9e9ec;
+  --muted: #a3a3ab;
+  --line: #44444b;
+  --soft: #2a2a2f;
+  --a: #86adf2;
+  --a-soft: #1f2c44;
+  --b: #f0a374;
+  --b-soft: #3d281b;
+}
+.card p { margin: 0.5em 0; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 0.9em 0; }
+.extra { color: var(--muted); font-size: 0.92em; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+img { max-width: 100%; height: auto; }
+mjx-container[display="true"] { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
+.gist {
+  margin: 0.6em 0;
+  padding: 0.55em 0.75em;
+  border-radius: 10px;
+  background: var(--a-soft);
+  font-weight: 600;
+  line-height: 1.45;
+}
+.gist.b { background: var(--b-soft); }
+.flow { margin: 0.7em 0; font-size: 0.9em; line-height: 1.4; }
+.flow > div {
+  position: relative;
+  padding: 0.45em 0.7em;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+}
+.flow > div + div { margin-top: 1.25em; }
+.flow > div + div::before {
+  content: "\2193";
+  position: absolute;
+  top: -1.3em;
+  left: 0.9em;
+  color: var(--muted);
+}
+.flow > div.b { border-color: var(--b); background: var(--b-soft); }
+.flow b, .vs b { color: var(--a); }
+.vs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5em;
+  margin: 0.7em 0;
+  font-size: 0.88em;
+  line-height: 1.4;
+}
+.vs > div { min-width: 0; padding: 0.5em 0.6em; border-radius: 8px; border-top: 3px solid var(--a); background: var(--a-soft); }
+.vs > div + div { border-top-color: var(--b); background: var(--b-soft); }
+.vs > div + div b { color: var(--b); }
+.vs b { display: block; margin-bottom: 0.2em; }
+.viz { margin: 0.7em 0; }
+.viz svg { display: block; width: 100%; height: auto; max-width: 420px; }
+.viz svg text { fill: var(--fg); font-family: inherit; font-size: 14px; }
+.viz svg .small { font-size: 12px; fill: var(--muted); }
+.viz svg .ta { fill: var(--a); }
+.viz svg .tb { fill: var(--b); }
+.viz svg .ink { stroke: var(--fg); fill: none; }
+.viz svg .grid { stroke: var(--line); fill: none; }
+.viz svg .sa { stroke: var(--a); fill: none; }
+.viz svg .sb { stroke: var(--b); fill: none; }
+.viz svg .fa { fill: var(--a); stroke: none; }
+.viz svg .fb { fill: var(--b); stroke: none; }
+.viz svg .fsa { fill: var(--a-soft); stroke: var(--a); }
+.viz svg .fsb { fill: var(--b-soft); stroke: var(--b); }
+.viz svg .fm { fill: var(--muted); stroke: none; }
+.viz figcaption, .media figcaption { color: var(--muted); font-size: 0.78em; line-height: 1.35; margin-top: 0.35rem; }
+.ctx { color: var(--muted); font-size: 0.78em; margin-top: 1em; }
+.media { margin-top: 0.75rem; }
+.media-source { color: var(--muted); margin-left: 0.35rem; }

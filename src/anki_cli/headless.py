@@ -183,6 +183,19 @@ class HeadlessClient:
         self.col.models.add(model)
         return model
 
+    def model_styling(self, model_name: str) -> dict[str, str]:
+        model = self._model(model_name)
+        template = model["tmpls"][0]
+        return {"css": model["css"], "front": template["qfmt"], "back": template["afmt"]}
+
+    def update_model_styling(self, model_name: str, css: str, front_template: str, back_template: str) -> None:
+        """Replace CSS and the first template's text; no schema change, so no full sync."""
+        self._before_write()
+        model = self._model(model_name)
+        model["css"] = css
+        model["tmpls"][0].update(qfmt=front_template, afmt=back_template)
+        self.col.models.update_dict(model)
+
     def find_notes(self, query: str) -> list[int]:
         return list(self.col.find_notes(query))
 
