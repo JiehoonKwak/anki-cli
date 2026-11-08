@@ -28,7 +28,6 @@ Obsolete `ANKI_CLI_BACKEND` values fail rather than silently falling back.
 
 ## Queue states and retries
 
-[.ctxdata.json](../.ctxdata.json) declares no retained project-data payload.
 Private cards, collections, queue jobs, ledger, media and credentials remain
 with their runtime owners; Git distributes package source and synthetic fixtures.
 
@@ -61,6 +60,26 @@ matches fail instead of choosing one arbitrarily.
 `drain --dry-run` validates queued work without opening the collection. Other
 commands' dry runs can still open/read the collection; check the particular
 command before using it as a no-access check.
+
+## Card text, styling and media names
+
+Enqueue rejects front, back or extra text containing control characters, or
+math whose TeX command was replaced by a line break or tab. Both mean a
+backslash escape such as `\r` in `\right` was interpreted by whatever wrote the
+field file; fix the writer rather than the stored card. `markdown-safe` parses
+`\(...\)` and `\[...\]` as math (mdit-py-plugins texmath) and writes them back
+verbatim, so math no longer requires `html` mode; there, `\[...\]` must stand
+on its own lines as a block.
+
+[card.css](../src/anki_cli/card.css) and the templates in
+[card.py](../src/anki_cli/card.py) own card styling: every upsert re-applies them to an existing `AnkiCLI-Basic-v1` when they
+differ. That styling defines the mobile visual classes (`gist`, `flow`, `vs`,
+`viz`, `ctx`) and their night-mode colors; it changes no fields, so it does not
+force a full sync. `--preview-html` renders the card with the same CSS and
+MathJax at phone width in day and night mode.
+
+Media filenames are capped at 100 characters because Anki truncates longer
+names on storage, which would leave the card pointing at a missing file.
 
 ## Verify application and sync separately
 

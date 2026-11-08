@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .render import FieldTextError, check_field_text
+
 
 SUPPORTED_SCHEMA_VERSION = 1
 DEFAULT_NOTETYPE = "AnkiCLI-Basic-v1"
@@ -19,6 +21,7 @@ EXTERNAL_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
 JOB_ID_RE = re.compile(r"^job_[A-Za-z0-9_.-]{8,120}$")
 TAG_RE = re.compile(r"^[^\s,]+$")
 MEDIA_FILENAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
+MEDIA_FILENAME_MAX_BEFORE_ANKI_TRUNCATES = 100
 MEDIA_KINDS = {"screenshot", "diagram", "figure", "other"}
 MEDIA_TEXT_FIELDS = ("caption", "source_uri", "source_locator", "alt", "selection_reason")
 
@@ -97,9 +100,11 @@ def normalize_tags(tags: list[str] | str | None) -> list[str]:
 def _media_filename(path: Path) -> str:
     data = path.read_bytes()
     digest = hashlib.sha256(data).hexdigest()[:12]
-    stem = MEDIA_FILENAME_RE.sub("_", path.stem).strip("._") or "media"
-    suffix = MEDIA_FILENAME_RE.sub("", path.suffix.lower())
-    return f"anki_cli_{digest}_{stem}{suffix}"
+    suffix = MEDIA_FILENAME_RE.sub("", path.suffix.lower())[:12]
+    prefix = f"anki_cli_{digest}_"
+    room = MEDIA_FILENAME_MAX_BEFORE_ANKI_TRUNCATES - len(prefix) - len(suffix)
+    stem = MEDIA_FILENAME_RE.sub("_", path.stem)[:room].strip("._") or "media"
+    return f"{prefix}{stem}{suffix}"
 
 
 def _normalize_media_kind(value: Any) -> str:
@@ -185,6 +190,7 @@ def build_upsert_job(
         raise SchemaError("back is required")
     if render_mode not in {"plain", "markdown-safe", "html"}:
         raise SchemaError(f"unsupported render_mode: {render_mode}")
+    _check_text_fields({"front": front, "back": back, "extra": extra})
     if metadata is not None:
         try:
             json.dumps(metadata)
@@ -225,6 +231,16 @@ def build_upsert_job(
     }
 
 
+def _check_text_fields(note: dict[str, Any]) -> None:
+    for key in ("front", "back", "extra"):
+        value = note.get(key)
+        if isinstance(value, str):
+            try:
+                check_field_text(f"note.{key}", value)
+            except FieldTextError as exc:
+                raise SchemaError(str(exc)) from exc
+
+
 def validate_job(job: dict[str, Any]) -> dict[str, Any]:
     if job.get("schema_version") != SUPPORTED_SCHEMA_VERSION:
         raise SchemaError(f"unsupported schema_version: {job.get('schema_version')!r}")
@@ -248,6 +264,7 @@ def validate_job(job: dict[str, Any]) -> dict[str, Any]:
     for key in ("front", "back"):
         if not isinstance(note.get(key), str) or not note[key].strip():
             raise SchemaError(f"note.{key} is required")
+    _check_text_fields(note)
     note["external_id"] = normalize_external_id(note.get("external_id"))
     note["tags"] = normalize_tags(note.get("tags"))
     render_mode = note.get("render_mode", DEFAULT_RENDER_MODE)

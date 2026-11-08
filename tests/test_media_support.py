@@ -17,6 +17,8 @@ class FakeClient:
         self.stored_media: list[dict[str, str]] = []
         self.added_note: dict | None = None
         self.card_deck = add_note_deck or "Deck"
+        self.styling = {"css": "old", "front": "{{Front}}", "back": "old"}
+        self.styling_updates = 0
 
     def deck_names(self) -> list[str]:
         return ["Deck"]
@@ -36,6 +38,13 @@ class FakeClient:
             "SourceHash",
             "MetaJSON",
         ]
+
+    def model_styling(self, model_name: str) -> dict[str, str]:
+        return self.styling
+
+    def update_model_styling(self, model_name: str, css: str, front_template: str, back_template: str) -> None:
+        self.styling = {"css": css, "front": front_template, "back": back_template}
+        self.styling_updates += 1
 
     def notes_info(self, notes: list[int] | None = None, query: str | None = None):
         if query is not None:
