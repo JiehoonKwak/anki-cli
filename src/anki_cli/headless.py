@@ -9,6 +9,7 @@ import pickle
 import platform
 import sqlite3
 import subprocess
+import time
 from pathlib import Path
 from typing import Any
 
@@ -333,6 +334,8 @@ class HeadlessClient:
             auth.endpoint = out.new_endpoint
         if self.profile.get("syncMedia", True):
             self.col.sync_media(auth)
+            while self.col.media_sync_status().active:
+                time.sleep(0.1)
         return {
             "collection": "synced",
             "media": "synced" if self.profile.get("syncMedia", True) else "disabled",

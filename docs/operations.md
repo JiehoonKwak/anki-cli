@@ -75,7 +75,11 @@ With `drain --sync`, inspect `sync.ok`: top-level `ok` and the exit code reflect
 job failures and can indicate success while sync failed. Applied jobs remain in
 `done`; use `sync` for recovery instead of enqueuing duplicate cards. Normal
 collection and media sync reuse profile authentication and follow the returned
-endpoint. A required full sync stops for an explicit upload/download decision;
+endpoint. Media sync starts asynchronously; the CLI keeps the collection open
+and polls its completion status before reporting `media: synced`. Background
+media errors are reported instead of a false success. The network I/O timeout
+does not impose a total time limit on a large media transfer.
+A required full sync stops for an explicit upload/download decision;
 never infer the direction or cross-device completion from local application.
 
 ## Cleanup lessons

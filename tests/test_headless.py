@@ -6,11 +6,12 @@ import pickle
 import sqlite3
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
 from anki.collection import Collection
-from anki.sync_pb2 import SyncCollectionResponse
+from anki.sync_pb2 import MediaSyncStatusResponse, SyncCollectionResponse
 
 from anki_cli.backend import client_scope, get_client
 from anki_cli.cli import core_card_state, main, upsert_job
@@ -110,10 +111,11 @@ def test_media_and_unicode_math_roundtrip(client, tmp_path):
 def test_review_telemetry_preserves_millisecond_ids(client):
     upsert_job(client, job())
     cid = client.find_cards("")[0]
+    review_id = (int(time.time()) - 86400) * 1000 + 123
     # Test fixture only: production implementation never writes revlog SQL.
     client.col.db.execute(
         "insert into revlog values (?,?,?,?,?,?,?,?,?)",
-        1790810000000,
+        review_id,
         cid,
         -1,
         2,
@@ -125,7 +127,7 @@ def test_review_telemetry_preserves_millisecond_ids(client):
     )
     assert client.get_reviews_of_cards([cid])[str(cid)] == [
         {
-            "id": 1790810000000,
+            "id": review_id,
             "cid": cid,
             "usn": -1,
             "ease": 2,
@@ -227,8 +229,21 @@ def test_sync_waits_for_media_and_uses_redirect(client, monkeypatch):
     monkeypatch.setattr(
         client.col, "sync_media", lambda auth: seen.append(auth.endpoint)
     )
+    statuses = iter([True, True, False])
+    polls = []
+    sleeps = []
+
+    def media_status():
+        active = next(statuses)
+        polls.append(active)
+        return MediaSyncStatusResponse(active=active)
+
+    monkeypatch.setattr(client.col, "media_sync_status", media_status)
+    monkeypatch.setattr("anki_cli.headless.time.sleep", sleeps.append)
     assert client.sync() == {"collection": "synced", "media": "synced"}
     assert seen == ["https://sync.example/"]
+    assert polls == [True, True, False]
+    assert sleeps == [0.1, 0.1]
     monkeypatch.setattr(
         client.col,
         "sync_media",
@@ -236,6 +251,49 @@ def test_sync_waits_for_media_and_uses_redirect(client, monkeypatch):
     )
     with pytest.raises(RuntimeError, match="media failure"):
         client.sync()
+
+
+def test_sync_reports_asynchronous_media_failure(client, monkeypatch):
+    client.profile = {"syncKey": "fixture-key"}
+    monkeypatch.setattr(
+        client.col,
+        "sync_collection",
+        lambda auth, media: SyncCollectionResponse(
+            required=SyncCollectionResponse.NO_CHANGES
+        ),
+    )
+    monkeypatch.setattr(client.col, "sync_media", lambda auth: None)
+    polls = []
+
+    def media_status():
+        polls.append(True)
+        if len(polls) == 1:
+            return MediaSyncStatusResponse(active=True)
+        raise RuntimeError("media upload failed asynchronously")
+
+    monkeypatch.setattr(client.col, "media_sync_status", media_status)
+    monkeypatch.setattr("anki_cli.headless.time.sleep", lambda seconds: None)
+    with pytest.raises(RuntimeError, match="media upload failed asynchronously"):
+        client.sync()
+    assert len(polls) == 2
+
+
+def test_sync_respects_disabled_media(client, monkeypatch):
+    client.profile = {"syncKey": "fixture-key", "syncMedia": False}
+    monkeypatch.setattr(
+        client.col,
+        "sync_collection",
+        lambda auth, media: SyncCollectionResponse(
+            required=SyncCollectionResponse.NO_CHANGES
+        ),
+    )
+    monkeypatch.setattr(
+        client.col, "sync_media", lambda auth: pytest.fail("media sync is disabled")
+    )
+    monkeypatch.setattr(
+        client.col, "media_sync_status", lambda: pytest.fail("media sync is disabled")
+    )
+    assert client.sync() == {"collection": "synced", "media": "disabled"}
 
 
 def test_profile_selection_is_explicit_when_ambiguous(tmp_path, monkeypatch):
