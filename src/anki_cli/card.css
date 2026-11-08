@@ -89,5 +89,5 @@ mjx-container[display="true"] { overflow-x: auto; overflow-y: hidden; max-width:
 .viz svg .fm { fill: var(--muted); stroke: none; }
 .viz figcaption, .media figcaption { color: var(--muted); font-size: 0.78em; line-height: 1.35; margin-top: 0.35rem; }
 .ctx { color: var(--muted); font-size: 0.78em; margin-top: 1em; }
-.media { margin-top: 0.75rem; }
+.media { margin: 0.75rem 0; }
 .media-source { color: var(--muted); margin-left: 0.35rem; }
