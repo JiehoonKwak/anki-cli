@@ -1,0 +1,4 @@
+[[test]]
+paths = ["src/**", "tests/**", "pyproject.toml", "uv.lock", ".agents/checks.toml"]
+run = "uv run --with pytest python -m pytest -q"
+timeout = 300
